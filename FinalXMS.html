@@ -1,0 +1,818 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>XMS Chat - Private Rooms (Auth UID)</title>
+<style>
+  body { font-family: monospace; background:#0d1217; color:#00ff9f; margin:0; display:flex; flex-direction:column; height:100vh; padding:20px; position:relative; }
+  input, button { font-family: monospace; padding:8px; margin:5px 0; width:100%; box-sizing:border-box; background:transparent; color:#00ff9f; border:2px solid #00ff9f; border-radius:4px; outline:none; }
+  input:focus, button:focus { box-shadow:0 0 5px #00ff9f; }.username-row { display:flex; gap:8px; align-items:center; } .username-row input#username { flex:1; margin:0; }
+
+.id-btn { width:44px; height:44px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; font-weight:700; cursor:pointer; }
+
+#myIDBox { display:none; margin-top:8px; padding:8px 10px; border:1px solid #00ff9f; border-radius:6px; background:rgba(13,18,23,0.9); color:#00ff9f; font-family:monospace; font-size:13px; z-index:1500; } #myIDBox button { width:auto; min-width:64px; padding:6px 8px; margin-left:8px; border-radius:4px; }
+
+#chat { flex:1; overflow-y:auto; padding:10px; border-top:1px solid #00ff9f; margin-bottom:10px; word-break:break-word; } .msg { margin-bottom:10px; } .timestamp { display:block; font-size:0.8em; color:#008060; }
+
+#roomCodeDisplay { position:fixed; top:10px; right:10px; background:#0d1217; border:1px solid #00ff9f; padding:8px 12px; border-radius:6px; font-weight:bold; user-select:all; display:none; z-index:1000; box-shadow:0 0 10px #00ff9f88; cursor:pointer; color:#00ff9f; }
+
+#chatLogo { width:100px; margin:10px 12px 20px 0; float:left; display:block; position:relative; z-index:10; } #login { clear:both; max-width:520px; position:relative; z-index:10; }
+
+#currentRoomWrapper { display: none; align-items: center; justify-content: center; position: relative; margin-bottom: 10px; padding: 6px 12px; border-bottom: 1px solid #00ff9f; } #currentRoomName { text-align: center; font-weight: bold; font-size: 1.1em; color: #00ff9f; font-family: monospace; flex: 1; } #exitRoomBtn { position: absolute; right: 12px; width: 40px; height: 20px; line-height: 6px; font-size: 0.9em; text-align: center; border: 1px solid #00ff9f; border-radius: 4px; background: transparent; color: #00ff9f; cursor: pointer; }
+
+#savedRooms { margin-top:10px; max-height:180px; overflow-y:auto; border:2px solid #00ff9f; padding:6px; border-radius:6px; position:relative; z-index:10; background:transparent; display:none; } .saved-room { cursor:pointer; padding:8px 10px; margin:6px 0; border-radius:8px; display:flex; justify-content:space-between; align-items:center; background:transparent; } .saved-room:hover { background:#00ff9f11; } .room-name { color:#00ff9f; } #modalInput::placeholder { color:#00ff9f66; }
+
+.room-controls { display:flex; gap:6px; align-items:center; width:100%; margin-top:6px; } .join-button { flex:1; min-width:0; } .rooms-btn { width:44px; height:44px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; }
+
+#friendsWrapper { margin-top:10px; } #friendsPanel { margin-top:8px; max-height:380px; overflow-y:auto; border:1px solid #00ff9f; padding:6px; border-radius:6px; position:relative; z-index:10; background:transparent; } #friendsPanel h3 { margin:0 0 6px 0; color:#00ff9f; font-size:1em; } .friend-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px; padding:6px; border-radius:6px; } .friend-name { color:#00ff9f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px; }
+
+.section-sep { height:1px; background:#00ff9f22; margin:8px 0; border-radius:2px; }
+
+@media (max-width:480px){ body{padding:12px} #chatLogo{width:80px} .id-btn{width:40px;height:40px} .rooms-btn{width:40px;height:40px} #exitRoomBtn { right: 6px; } } </style>
+
+</head>
+<body>
+  <div id="tsparticles" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1;"></div>  <img id="chatLogo" src="https://i.ibb.co/Jwm0ypYs/file-00000000b60461f49ef552fe357ae6c3.jpg" alt="XMS Chat Logo" />  <div id="login">
+    <h2>XMS Chat -<br>Create or Join Private Rooms</h2><div id="chatContainer"></div><script>
+  const messages = [
+    "All <span class='small-text1'>Meeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee</span>!!!",
+    "Welcome to a very fun safe and polite place! <span class='small-text'>or is it?</span>",
+    "Have a great time being bullied.",
+    "et tu Hashim?",
+    "Stay Safe!! <span class='small-text'> definitly not unsafe and within a close range of diddy...</span>"
+  ];
+
+  function addRandomMessage() {
+    const container = document.getElementById("chatContainer");
+    const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+
+    const h3 = document.createElement("h3");
+    h3.innerHTML = randomMsg; // ✅ allows span styling
+
+    container.appendChild(h3);
+  }
+
+  addRandomMessage();
+</script><div class="username-row">
+  <input id="username" type="text" placeholder="Username" autocomplete="off" />
+  <button id="showIDBtn" class="id-btn" title="Show your ID">ID</button>
+</div>
+
+<div id="myIDBox" aria-hidden="true"></div>
+
+<input id="roomCodeInput" type="text" placeholder="Enter 6-digit Room Code (hex)" maxlength="6" autocomplete="off" />
+
+<div class="room-controls">
+  <button id="joinBtn" class="join-button">Join Room</button>
+  <button id="showRoomsBtn" class="rooms-btn" title="Show your Rooms">R</button>
+</div>
+
+<button id="createBtn">Create Room</button>
+
+<div id="savedRooms" aria-hidden="true"></div>
+
+<!-- Add Friend -->
+<div id="friendsWrapper">
+  <input id="friendIDInput" type="text" placeholder="Add Friend by ID" autocomplete="off" />
+  <button id="addFriendBtn">Add Friend</button>
+
+  <div id="friendsPanel">
+    <h3>Friends</h3>
+    <div id="friendsList"></div>
+
+    <div class="section-sep"></div>
+
+    <h3>Requests</h3>
+    <div id="requestsList"></div>
+
+    <div class="section-sep"></div>
+
+    <h3>Invites</h3>
+    <div id="invitesList"></div>
+  </div>
+</div>
+
+  </div>  <!-- room header (hidden until in a room) -->  <div id="currentRoomWrapper">
+    <div id="currentRoomName">Room Name</div>
+    <button id="exitRoomBtn">Exit</button>
+  </div>  <div id="chat-ui" style="display:none; flex-direction:column; height:100%;">
+    <div id="chat"></div>
+    <form id="messageForm" style="display:flex;">
+      <input id="message" type="text" placeholder="Type a message and press Enter" autocomplete="off" style="flex:1;" />
+      <button type="submit" style="width:80px">Send</button>
+    </form>
+  </div>  <div id="roomCodeDisplay" title="Click to copy room code"></div>  <div id="modalOverlay" style="display:none;position:fixed;inset:0;background:#000000aa;z-index:2000;align-items:center;justify-content:center;">
+    <div id="modalBox" style="background:#0d1217;border:2px solid #00ff9f;padding:20px;border-radius:10px;min-width:300px;max-width:520px;text-align:center;">
+      <div id="modalContent" style="margin-bottom:12px;color:#00ff9f;font-family:monospace;white-space:pre-wrap;"></div>
+      <input id="modalInput" type="text" placeholder="" style="width:100%;padding:8px;margin-bottom:10px;background:#0d1217;color:#00ff9f;border:1px solid #00ff9f;border-radius:4px;font-family:monospace;outline:none;" />
+      <div style="display:flex;gap:8px;">
+        <button id="modalCancel" style="flex:1;background:#0d1217;color:#00ff9f;border:1px solid #00ff9f;border-radius:4px;padding:8px;">Cancel</button>
+        <button id="modalConfirm" style="flex:1;background:#00ff9f;color:#0d1217;border:1px solid #00ff9f;border-radius:4px;padding:8px;">Confirm</button>
+      </div>
+    </div>
+  </div>  <div id="warningBox" style="display:none;position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#0d1217;border:2px solid #00ff9f;color:#00ff9f;padding:10px 18px;border-radius:8px;font-family:monospace;z-index:3000;box-shadow:0 0 10px #00ff9f88;">Warning</div>  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.10.1/tsparticles.bundle.min.js"></script>  <script>
+    tsParticles.load("tsparticles", {
+      background: { color: "#0d1217" },
+      fpsLimit: 60,
+      particles: {
+        number: { value: 70, density: { enable: true, area: 800 } },
+        color: { value: "#00ff9f" },
+        shape: { type: "circle" },
+        opacity: { value: 0.75 },
+        size: { value: 3 },
+        move: { enable: true, speed: 0.5 },
+        links: { enable: true, distance: 120, color: "#00ff9f", opacity: 0.4, width: 1 }
+      },
+      interactivity: { events: { onhover: { enable: true, mode: "repulse" }, onclick: { enable: false } }, modes: { repulse: { distance: 50 } } }
+    });
+  </script>  <!-- Firebase + Chat + Friends + Invites (uses Firebase Auth UID) -->  <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getDatabase, ref, push, onChildAdded, onChildRemoved, set, get, off, update } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA5pkhYukVanTNDrbdrNFunGqckfIBMnoA",
+  authDomain: "xms-chat-iqhtml256.firebaseapp.com",
+  databaseURL: "https://xms-chat-iqhtml256-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "xms-chat-iqhtml256",
+  storageBucket: "xms-chat-iqhtml256.appspot.com",
+  messagingSenderId: "325064982938",
+  appId: "1:325064982938:web:bdf34c0ea087f47c5cfa23",
+  measurementId: "G-H0ZP0G020Z"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+// ---------- Profanity Filter ----------
+const badWords = ["fuck","shit","damn","bitch","ass","nigga","nigger","asshole","bastard","bollocks","cocksucker","cunt","dick","dickhead","dyke","fag","faggot","motherfucker","piss","prick","pussy","slut","twat","wanker","whore","arse","asshat","ballsack","bollocking","cock","cum","cumming","douche","douchebag","dumbass","fuckface","fuckhead","fuckoff","fuckyourself","jackass","jerkoff","kunt","kys","motherfucking","numbnuts","penis","pissed","poon","scrotum","shitbag","shitfuck","slutbag","sonofabitch","tit","twatwaffle","twunt","vagina","wank","willy","bugger","arsewipe","dickbag","dickweed","fisting","knobhead","minge","muff","pussylicker","scumbag","shag","spastic","tosser","twatface","anus","balls","blowjob","clit","cockhead","cunnilingus","ejaculate","erection","genitals","handjob","horny","masturbate","orgasm","penishead","poop","rape","rimjob","sex","semen","smegma","testicles","tits","vulva","wetback","asswipe","boobs","dildo","ejaculation","fudgepacker","gangbang","labia","penis","rapist","titfuck","titties","zoophile"];
+const badWordsRegex = new RegExp(`\\b(${badWords.join('|')})\\b`, 'gi');
+function censorMessage(msg){ return msg.replace(badWordsRegex, match => '*'.repeat(match.length)); }
+
+// ---------- DOM ----------
+const loginDiv = document.getElementById('login');
+const chatUi = document.getElementById('chat-ui');
+const chatDiv = document.getElementById('chat');
+const messageInput = document.getElementById('message');
+const usernameInput = document.getElementById('username');
+const roomCodeInput = document.getElementById('roomCodeInput');
+const joinBtn = document.getElementById('joinBtn');
+const createBtn = document.getElementById('createBtn');
+const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+const messageForm = document.getElementById('messageForm');
+const savedRoomsDiv = document.getElementById('savedRooms');
+const currentRoomNameEl = document.getElementById('currentRoomName');
+
+const showIDBtn = document.getElementById('showIDBtn');
+const showRoomsBtn = document.getElementById('showRoomsBtn');
+const myIDBox = document.getElementById('myIDBox');
+
+const friendIDInput = document.getElementById('friendIDInput');
+const addFriendBtn = document.getElementById('addFriendBtn');
+const friendsListDiv = document.getElementById('friendsList');
+const requestsListDiv = document.getElementById('requestsList');
+const invitesListDiv = document.getElementById('invitesList');
+
+const modalOverlay = document.getElementById('modalOverlay');
+const modalContent = document.getElementById('modalContent');
+const modalInput = document.getElementById('modalInput');
+const modalCancel = document.getElementById('modalCancel');
+const modalConfirm = document.getElementById('modalConfirm');
+const warningBox = document.getElementById('warningBox');
+
+const currentRoomWrapper = document.getElementById('currentRoomWrapper');
+const exitRoomBtn = document.getElementById('exitRoomBtn');
+
+// ---------- user id & username (now uses Firebase Auth UID) ----------
+let currentUserID = null; // WILL be set from Firebase Auth
+let currentUserName = localStorage.getItem('xmsUserName') || null;
+let currentRoom = null;
+let chatRef = null;
+
+// wait for auth to initialise
+let _authReadyResolve;
+const authReady = new Promise(resolve => { _authReadyResolve = resolve; });
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    // not authenticated -> redirect to auth page
+    try { window.location.href = './auth.html'; } catch(e){ console.warn('redirect failed', e); }
+    _authReadyResolve();
+    return;
+  }
+
+  currentUserID = user.uid;
+  currentUserName = user.displayName || user.email || localStorage.getItem('xmsUserName') || null;
+  if (currentUserName) usernameInput.value = currentUserName;
+
+  // load user-specific UI pieces now we have a UID
+  try { await loadSavedRooms(); } catch(e){ console.warn('loadSavedRooms after auth', e); }
+  try { await loadFriends(); } catch(e){ console.warn('loadFriends after auth', e); }
+
+  _authReadyResolve();
+});
+
+// ---------- helpers ----------
+function generateRoomCode(){
+  return Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0').toUpperCase();
+}
+
+function showWarning(msg, duration = 2500){
+  warningBox.textContent = msg;
+  warningBox.style.display = 'block';
+  clearTimeout(warningBox._t);
+  warningBox._t = setTimeout(()=> warningBox.style.display = 'none', duration);
+}
+
+// modal helper (unchanged)
+function showModal({ title = '', placeholder = '', defaultValue = '', onConfirm = ()=>{}, onCancel = ()=>{}, hideInput = false, confirmText = 'Confirm', cancelText = 'Cancel' } = {}){
+  while(modalContent.firstChild) modalContent.removeChild(modalContent.firstChild);
+  const titleNode = document.createElement('div');
+  titleNode.textContent = title;
+  titleNode.style.marginBottom = '8px';
+  titleNode.style.color = '#00ff9f';
+  modalContent.appendChild(titleNode);
+
+  modalInput.value = defaultValue || '';
+  modalInput.placeholder = placeholder || '';
+  modalInput.style.display = hideInput ? 'none' : 'block';
+  modalOverlay.style.display = 'flex';
+  if(!hideInput) modalInput.focus();
+
+  modalConfirm.textContent = confirmText;
+  modalCancel.textContent = cancelText;
+
+  function cleanup(){
+    modalOverlay.style.display = 'none';
+    modalConfirm.removeEventListener('click', ok);
+    modalCancel.removeEventListener('click', cancel);
+    modalInput.removeEventListener('keydown', onKey);
+  }
+  function ok(){
+    const val = hideInput ? null : modalInput.value.trim();
+    cleanup();
+    try { onConfirm(val); } catch(e){ console.error(e); }
+  }
+  function cancel(){
+    cleanup();
+    try { onCancel(); } catch(e){ console.error(e); }
+  }
+  function onKey(e){ if(e.key === 'Enter') ok(); if(e.key === 'Escape') cancel(); }
+
+  modalConfirm.addEventListener('click', ok);
+  modalCancel.addEventListener('click', cancel);
+  modalInput.addEventListener('keydown', onKey);
+}
+
+// ---------- display message ----------
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function displayMessage(msg){
+  const div = document.createElement('div');
+  div.classList.add('msg');
+  const user = (msg && msg.user) ? msg.user : 'Unknown';
+  const text = (msg && msg.text) ? msg.text : '';
+  const time = (msg && msg.timestamp) ? new Date(msg.timestamp).toLocaleTimeString() : '';
+  div.innerHTML = `<strong>${escapeHtml(user)}:</strong> ${escapeHtml(text)}<div class="timestamp">${time}</div>`;
+  chatDiv.appendChild(div);
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+// ---------- realtime chat listener ----------
+function startChatListener(roomCode){
+  if(chatRef) off(chatRef);
+  chatRef = ref(db, `rooms/${roomCode}/messages`);
+  onChildAdded(chatRef, snap => {
+    const val = snap.val();
+    displayMessage(val);
+  });
+}
+
+// ---------- saved rooms ----------
+async function loadSavedRooms(){
+  savedRoomsDiv.innerHTML = '';
+  if(!currentUserID) return;
+  try {
+    const snap = await get(ref(db, `users/${currentUserID}/savedRooms`));
+    if(!snap.exists()) return;
+    const rooms = snap.val();
+    Object.entries(rooms)
+      .sort((a,b) => b[1].lastJoined - a[1].lastJoined)
+      .forEach(([code, data]) => {
+        if([...savedRoomsDiv.children].some(c => c.dataset.code === code)) return;
+        const div = document.createElement('div');
+        div.classList.add('saved-room');
+        div.dataset.code = code;
+
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.style.gap = '8px';
+
+        const roomSpan = document.createElement('span');
+        roomSpan.classList.add('room-name');
+        roomSpan.textContent = `[${data.name}] (${code})`;
+        roomSpan.style.cursor = 'pointer';
+        roomSpan.addEventListener('click', () => { roomCodeInput.value = code; joinRoom(); });
+
+        left.appendChild(roomSpan);
+
+        const removeBtn = document.createElement('span');
+        removeBtn.textContent = '✖';
+        removeBtn.style.color = '#00ff9f';
+        removeBtn.style.cursor = 'pointer';
+        removeBtn.style.fontWeight = '700';
+        removeBtn.title = 'Remove saved room';
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showModal({
+            title: `Remove room [${data.name}] (${code}) from saved rooms?`,
+            hideInput: true,
+            confirmText: 'Remove',
+            cancelText: 'Cancel',
+            onConfirm: async () => {
+              try {
+                await set(ref(db, `users/${currentUserID}/savedRooms/${code}`), null);
+                await loadSavedRooms();
+                showWarning('Saved room removed', 1500);
+              } catch(err){
+                console.error(err);
+                showWarning('Failed to remove room');
+              }
+            }
+          });
+        });
+
+        div.appendChild(left);
+        div.appendChild(removeBtn);
+        savedRoomsDiv.appendChild(div);
+      });
+  } catch(e){
+    console.error('loadSavedRooms', e);
+  }
+}
+
+// ---------- save username (immediate) ----------
+usernameInput.addEventListener('input', () => {
+  const name = usernameInput.value.trim();
+  currentUserName = name || null;
+  if(currentUserName) localStorage.setItem('xmsUserName', currentUserName);
+  else localStorage.removeItem('xmsUserName');
+
+  if(currentUserName) loadSavedRooms();
+  else savedRoomsDiv.innerHTML = '';
+});
+
+function showChatUI(roomName) {
+  loginDiv.style.display = 'none';
+  chatUi.style.display = 'flex';
+
+  const currentRoomWrapper = document.getElementById('currentRoomWrapper');
+  const currentRoomName = document.getElementById('currentRoomName');
+
+  currentRoomWrapper.style.display = 'flex';
+  currentRoomName.textContent = roomName || 'Room';
+}
+
+// ---------- create room ----------
+async function createRoom(){
+  const username = (usernameInput.value || '').trim();
+  if(!username){ showWarning('Please enter your username first!'); return; }
+  currentUserName = username;
+  localStorage.setItem('xmsUserName', currentUserName);
+  showModal({
+    title: 'Enter a name for this room:',
+    placeholder: 'My Room',
+    defaultValue: '',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    onConfirm: async (roomName) => {
+      if(!roomName) return;
+      currentRoom = generateRoomCode();
+      roomCodeDisplay.textContent = `Room Code: ${currentRoom}`;
+      try {
+        await set(ref(db, `rooms/${currentRoom}/info`), { creator: username, creatorID: currentUserID, name: roomName, createdAt: Date.now() });
+        await update(ref(db, `users/${currentUserID}/savedRooms/${currentRoom}`), { name: roomName, lastJoined: Date.now() });
+        showChatUI(roomName);
+        await loadSavedRooms();
+        startChatListener(currentRoom);
+      } catch(e){
+        console.error(e);
+        showWarning('Failed to create room');
+      }
+    }
+  });
+}
+
+// ---------- join room ----------
+async function joinRoom(){
+  const username = (usernameInput.value || '').trim();
+  if(!username){ showWarning('Please enter your username first!'); return; }
+  currentUserName = username;
+  localStorage.setItem('xmsUserName', currentUserName);
+  const roomCode = (roomCodeInput.value || '').trim().toUpperCase();
+  if(!roomCode || roomCode.length !== 6 || !/^[0-9A-F]+$/.test(roomCode)){ showWarning('Invalid room code'); return; }
+  try {
+    const snap = await get(ref(db, `rooms/${roomCode}/info`));
+    if(!snap.exists()){ showWarning('Room not found'); return; }
+    const roomName = snap.val().name || 'Unnamed Room';
+    currentRoom = roomCode;
+    roomCodeDisplay.textContent = `Room Code: ${roomCode}`;
+    await update(ref(db, `users/${currentUserID}/savedRooms/${currentRoom}`), { name: roomName, lastJoined: Date.now() });
+    showChatUI(roomName);
+    await loadSavedRooms();
+    startChatListener(currentRoom);
+  } catch(e){
+    console.error(e);
+    showWarning('Failed to join room');
+  }
+}
+
+// ---------- send message ----------
+messageForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if(!currentUserName || !currentRoom){ showWarning('You must join a room and set a username first'); return; }
+  let text = (messageInput.value || '').trim();
+  if(!text) return;
+  const clean = censorMessage(text);
+  messageInput.value = '';
+  try {
+    await push(ref(db, `rooms/${currentRoom}/messages`), { user: currentUserName, userID: currentUserID, text: clean, timestamp: Date.now() });
+  } catch(e){
+    console.error(e);
+    showWarning('Failed to send message');
+  }
+});
+
+// ---------- wire up base buttons ----------
+createBtn.addEventListener('click', createRoom);
+joinBtn.addEventListener('click', joinRoom);
+
+// ---------- ID panel ----------
+showIDBtn.addEventListener('click', () => {
+  const isOpen = myIDBox.style.display === 'block';
+  if (isOpen) {
+    myIDBox.style.display = 'none';
+    myIDBox.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  // populate
+  myIDBox.innerHTML = '';
+  const idText = document.createElement('span');
+  idText.textContent = 'Your ID: ';
+  const strong = document.createElement('strong');
+  strong.textContent = currentUserID || '(not signed in)';
+  idText.appendChild(strong);
+  myIDBox.appendChild(idText);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.textContent = 'Copy';
+  copyBtn.addEventListener('click', () => {
+    if(!currentUserID) return showWarning('No ID to copy');
+    navigator.clipboard.writeText(currentUserID).then(() => {
+      showWarning('ID copied!');
+    }).catch(() => showWarning('Failed to copy ID'));
+  });
+  myIDBox.appendChild(copyBtn);
+
+  myIDBox.style.display = 'block';
+  myIDBox.setAttribute('aria-hidden', 'false');
+});
+
+// Rooms popup toggle (loads rooms when opened)
+showRoomsBtn.addEventListener('click', async () => {
+  const isOpen = savedRoomsDiv.style.display === 'block';
+  if (isOpen) {
+    savedRoomsDiv.style.display = 'none';
+    savedRoomsDiv.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  await loadSavedRooms();
+  savedRoomsDiv.style.display = 'block';
+  savedRoomsDiv.setAttribute('aria-hidden', 'false');
+});
+
+// Copy room code from floating display
+roomCodeDisplay.addEventListener('click', () => {
+  const text = roomCodeDisplay.textContent.replace('Room Code:', '').trim();
+  navigator.clipboard.writeText(text).then(() => showWarning('Room code copied!')).catch(()=> showWarning('Failed to copy'));
+});
+
+// ---------- Friends: send request ----------
+addFriendBtn.addEventListener('click', async () => {
+  const targetID = (friendIDInput.value || '').trim();
+  if (!targetID) return showWarning('Enter a valid ID');
+  if (targetID === currentUserID) return showWarning("You can't add yourself");
+
+  try {
+    // optional check: user exists
+    const targetSnap = await get(ref(db, `users/${targetID}`));
+    if (!targetSnap.exists()) {
+      // warn but still allow sending request (comment/uncomment as desired)
+      // return showWarning('User not found');
+    }
+
+    await set(ref(db, `friendRequests/${targetID}/${currentUserID}`), {
+      fromID: currentUserID,
+      fromName: currentUserName || 'Unknown',
+      timestamp: Date.now()
+    });
+    friendIDInput.value = '';
+    showWarning('Friend request sent!');
+  } catch (err) {
+    console.error(err);
+    showWarning('Failed to send friend request');
+  }
+});
+
+// ---------- Friends: incoming requests ----------
+onChildAdded(ref(db, `friendRequests/${currentUserID}`), snap => {
+  const fromID = snap.key;
+  const data = snap.val();
+  if (!data) return;
+
+  // If element exists already, skip
+  if (document.getElementById(`request-${fromID}`)) return;
+
+  const row = document.createElement('div');
+  row.className = 'friend-row';
+  row.id = `request-${fromID}`;
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'friend-name';
+  nameSpan.textContent = data.fromName || fromID;
+
+  const btns = document.createElement('div');
+  btns.style.display = 'flex';
+  btns.style.gap = '6px';
+
+  const acceptBtn = document.createElement('button');
+  acceptBtn.textContent = 'Accept';
+  acceptBtn.addEventListener('click', async () => {
+    try {
+      await set(ref(db, `users/${currentUserID}/friends/${fromID}`), { name: data.fromName });
+      await set(ref(db, `users/${fromID}/friends/${currentUserID}`), { name: currentUserName || 'Unknown' });
+      await set(ref(db, `friendRequests/${currentUserID}/${fromID}`), null);
+      row.remove();
+      await loadFriends();
+      showWarning('Friend added!');
+    } catch (err) {
+      console.error(err);
+      showWarning('Failed to accept friend');
+    }
+  });
+
+  const declineBtn = document.createElement('button');
+  declineBtn.textContent = 'Decline';
+  declineBtn.addEventListener('click', async () => {
+    try {
+      await set(ref(db, `friendRequests/${currentUserID}/${fromID}`), null);
+      row.remove();
+      showWarning('Friend request declined');
+    } catch (err) {
+      console.error(err);
+      showWarning('Failed to decline request');
+    }
+  });
+
+  btns.appendChild(acceptBtn);
+  btns.appendChild(declineBtn);
+
+  row.appendChild(nameSpan);
+  row.appendChild(btns);
+  requestsListDiv.appendChild(row);
+});
+
+// ---------- Friends list loader ----------
+async function loadFriends() {
+  friendsListDiv.innerHTML = '';
+  if (!currentUserID) return;
+
+  try {
+    const snap = await get(ref(db, `users/${currentUserID}/friends`));
+    if (!snap.exists()) return;
+    const friends = snap.val();
+
+    Object.entries(friends).forEach(([fid, info]) => {
+      if (document.getElementById(`friend-${fid}`)) return; // avoid duplicates
+
+      const row = document.createElement('div');
+      row.className = 'friend-row';
+      row.id = `friend-${fid}`;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'friend-name';
+      nameSpan.textContent = info.name || fid;
+
+      const btns = document.createElement('div');
+      btns.style.display = 'flex';
+      btns.style.gap = '6px';
+
+      const inviteBtn = document.createElement('button');
+      inviteBtn.textContent = 'Invite';
+      inviteBtn.addEventListener('click', async () => {
+        try {
+          const snapRooms = await get(ref(db, `users/${currentUserID}/savedRooms`));
+          if (!snapRooms.exists()) {
+            showWarning('You have no saved rooms to invite');
+            return;
+          }
+          const rooms = snapRooms.val();
+          const roomList = Object.entries(rooms).map(([code, data]) => `${data.name} (${code})`).join('\n');
+
+          showModal({
+            title: `Invite ${info.name} to which room?\n\n${roomList}`,
+            placeholder: 'Enter Room Code',
+            confirmText: 'Invite',
+            cancelText: 'Cancel',
+            onConfirm: async (roomCodeEntered) => {
+              if (!roomCodeEntered) return;
+              const codeMatch = roomCodeEntered.match(/([0-9A-F]{6})/i);
+              const code = codeMatch ? codeMatch[1].toUpperCase() : roomCodeEntered.toUpperCase();
+              await set(ref(db, `invites/${fid}/${currentUserID}_${code}`), {
+                fromID: currentUserID,
+                fromName: currentUserName || 'Unknown',
+                roomCode: code,
+                timestamp: Date.now()
+              });
+              showWarning('Invite sent!');
+            }
+          });
+        } catch (err) {
+          console.error(err);
+          showWarning('Failed to send invite');
+        }
+      });
+
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => {
+        showModal({
+          title: `Remove ${info.name} from friends?`,
+          hideInput: true,
+          confirmText: 'Remove',
+          cancelText: 'Cancel',
+          onConfirm: async () => {
+            try {
+              await set(ref(db, `users/${currentUserID}/friends/${fid}`), null);
+              await set(ref(db, `users/${fid}/friends/${currentUserID}`), null);
+              row.remove();
+              showWarning('Friend removed');
+            } catch (err) {
+              console.error(err);
+              showWarning('Failed to remove friend');
+            }
+          }
+        });
+      });
+
+      btns.appendChild(inviteBtn);
+      btns.appendChild(removeBtn);
+
+      row.appendChild(nameSpan);
+      row.appendChild(btns);
+      friendsListDiv.appendChild(row);
+    });
+  } catch (err) {
+    console.error('loadFriends', err);
+  }
+}
+
+// ---------- Invites: incoming ----------
+onChildAdded(ref(db, `invites/${currentUserID}`), snap => {
+  const key = snap.key;
+  const data = snap.val();
+  if (!data) return;
+
+  // avoid duplicates
+  if (document.getElementById(`invite-${key}`)) return;
+
+  const row = document.createElement('div');
+  row.className = 'friend-row';
+  row.id = `invite-${key}`;
+
+  const text = document.createElement('span');
+  text.className = 'friend-name';
+  text.textContent = `${data.fromName} invited you to room ${data.roomCode}`;
+
+  const btns = document.createElement('div');
+  btns.style.display = 'flex';
+  btns.style.gap = '6px';
+
+  const acceptBtn = document.createElement('button');
+  acceptBtn.textContent = 'Accept';
+  acceptBtn.addEventListener('click', async () => {
+    roomCodeInput.value = data.roomCode;
+    await joinRoom();
+    await set(ref(db, `invites/${currentUserID}/${key}`), null);
+    row.remove();
+  });
+
+  const declineBtn = document.createElement('button');
+  declineBtn.textContent = 'Decline';
+  declineBtn.addEventListener('click', async () => {
+    await set(ref(db, `invites/${currentUserID}/${key}`), null);
+    row.remove();
+  });
+
+  btns.appendChild(acceptBtn);
+  btns.appendChild(declineBtn);
+
+  row.appendChild(text);
+  row.appendChild(btns);
+  invitesListDiv.appendChild(row);
+});
+
+// ---------- Exit button handler ----------
+if (exitRoomBtn) {
+  exitRoomBtn.addEventListener('click', () => {
+    try {
+      if (chatRef) off(chatRef); // stop listening
+      chatDiv.innerHTML = '';
+      chatUi.style.display = 'none';
+      loginDiv.style.display = 'block';
+      currentRoom = null;
+      roomCodeDisplay.style.display = 'none';
+      if (currentRoomWrapper) currentRoomWrapper.style.display = 'none';
+      if (currentRoomNameEl) currentRoomNameEl.textContent = '';
+    } catch (err) {
+      console.error('exitRoom error', err);
+    }
+  });
+}
+
+// ---------- remove rows when DB entries removed ----------
+onChildRemoved(ref(db, `friendRequests/${currentUserID}`), (snap) => {
+  const id = snap.key;
+  const el = document.getElementById(`request-${id}`);
+  if (el) el.remove();
+});
+onChildRemoved(ref(db, `invites/${currentUserID}`), (snap) => {
+  const id = snap.key;
+  const el = document.getElementById(`invite-${id}`);
+  if (el) el.remove();
+});
+onChildRemoved(ref(db, `users/${currentUserID}/friends`), (snap) => {
+  const id = snap.key;
+  const el = document.getElementById(`friend-${id}`);
+  if (el) el.remove();
+});
+
+// cleanup Firebase listeners when leaving the page
+window.addEventListener('beforeunload', () => {
+  try {
+    off(ref(db, `friendRequests/${currentUserID}`));
+    off(ref(db, `invites/${currentUserID}`));
+    off(ref(db, `users/${currentUserID}/friends`));
+    if (chatRef) off(chatRef);
+  } catch (err) {
+    console.warn('cleanup error', err);
+  }
+});
+
+// close popups when clicking outside them
+document.addEventListener('click', (e) => {
+  // ignore clicks inside the modal overlay (so modal works normally)
+  if (modalOverlay.style.display === 'flex' && modalOverlay.contains(e.target)) return;
+
+  if (!myIDBox.contains(e.target) && !showIDBtn.contains(e.target)) {
+    myIDBox.style.display = 'none';
+    myIDBox.setAttribute('aria-hidden', 'true');
+  }
+
+  if (!savedRoomsDiv.contains(e.target) && !showRoomsBtn.contains(e.target)) {
+    savedRoomsDiv.style.display = 'none';
+    savedRoomsDiv.setAttribute('aria-hidden', 'true');
+  }
+});
+
+// hide popups on ESC too (also closes modal via existing handlers)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (modalOverlay.style.display === 'flex') {
+      // trigger modalCancel handler
+      modalCancel.click();
+    } else {
+      myIDBox.style.display = 'none';
+      myIDBox.setAttribute('aria-hidden', 'true');
+      savedRoomsDiv.style.display = 'none';
+      savedRoomsDiv.setAttribute('aria-hidden', 'true');
+    }
+  }
+});
+
+// ---------- initial load (wait for auth) ----------
+(async function init() {
+  await authReady; // ensure auth state is known before proceeding
+
+  if (currentUserName) {
+    usernameInput.value = currentUserName;
+  }
+
+  // if auth present, these were already loaded in onAuthStateChanged, but call again safely
+  try { await loadFriends(); } catch(e){}
+})();
+  </script>
+</body>
+</html>
